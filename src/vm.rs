@@ -1,4 +1,7 @@
-use std::collections::{VecDeque, HashMap};
+use std::{
+    cmp::Ordering,
+    collections::{HashMap, VecDeque},
+};
 
 #[derive(Clone, Copy, Debug)]
 pub enum Value {
@@ -14,41 +17,52 @@ pub enum Op {
     Sub(Reg, Value),
     Mul(Reg, Value),
     Div(Reg, Value),
+    Mov(Reg, Value),
+    Cmp(Value, Value),
     Mark(&'static str),
     Goto(&'static str),
+    GotoLess(&'static str),
+    GotoEqual(&'static str),
+    GotoGreater(&'static str),
+    Write(Value),
+    Read(Reg),
 }
 
 #[derive(Clone, Copy, Debug)]
 pub enum Reg {
-    A,
-    B,
-    C,
+    AX,
+    BX,
+    CX,
+    Cmp,
     OpPtr,
 }
 
 #[derive(Default, Debug)]
 pub struct Regs {
-    pub a: f64,
-    pub b: f64,
-    pub c: f64,
-    pub opptr: usize,
+    ax: f64,
+    bx: f64,
+    cx: f64,
+    cmp: f64,
+    opptr: usize,
 }
 
 impl Regs {
     fn resolve(&self, reg: Reg) -> &f64 {
         match reg {
-            Reg::A => &self.a,
-            Reg::B => &self.a,
-            Reg::C => &self.a,
+            Reg::AX => &self.ax,
+            Reg::BX => &self.bx,
+            Reg::CX => &self.cx,
+            Reg::Cmp => &self.cmp,
             Reg::OpPtr => panic!("ты шо дурак"),
         }
     }
 
     fn resolve_mut(&mut self, reg: Reg) -> &mut f64 {
         match reg {
-            Reg::A => &mut self.a,
-            Reg::B => &mut self.a,
-            Reg::C => &mut self.a,
+            Reg::AX => &mut self.ax,
+            Reg::BX => &mut self.bx,
+            Reg::CX => &mut self.cx,
+            Reg::Cmp => &mut self.cmp,
             Reg::OpPtr => panic!("ты шо дурак"),
         }
     }
@@ -61,11 +75,16 @@ pub struct VM {
     stack_size: Option<usize>,
     marks: HashMap<&'static str, usize>,
     regs: Regs,
+    sout: VecDeque<char>,
+    sin: VecDeque<char>,
 }
 
 impl VM {
     pub fn with_sized_stack(stack_size: usize) -> Self {
-        Self { stack_size: Some(stack_size), ..Default::default() }
+        Self {
+            stack_size: Some(stack_size),
+            ..Default::default()
+        }
     }
 
     pub fn load(&mut self, code: &[Op]) {
@@ -87,7 +106,7 @@ impl VM {
                         }
                     }
                     self.stack.push_back(self.retrieve_value(val));
-                },
+                }
                 Op::Pop(reg) => {
                     if let Some(val) = self.stack.pop_back() {
                         *self.regs.resolve_mut(reg) = val;
@@ -105,11 +124,44 @@ impl VM {
                     }
                     *self.regs.resolve_mut(reg) /= x;
                 }
+                Op::Mov(reg, val) => *self.regs.resolve_mut(reg) = self.retrieve_value(val),
+                Op::Cmp(val1, val2) => {
+                    let ord = self
+                        .retrieve_value(val1)
+                        .total_cmp(&self.retrieve_value(val2));
+                    self.regs.cmp = match ord {
+                        Ordering::Less => -1.,
+                        Ordering::Equal => 0.,
+                        Ordering::Greater => 1.,
+                    }
+                }
                 Op::Mark(id) => drop(self.marks.insert(id, self.regs.opptr)),
-                Op::Goto(id) => if let Some(index) = self.marks.get(id).cloned() {
-                    self.regs.opptr = index;
-                } else {
-                    Err(ExecutionError::NoSuchMark)?
+                Op::Goto(id) => self.goto(id)?,
+                Op::GotoLess(id) => {
+                    if self.regs.cmp == -1. {
+                        self.goto(id)?
+                    }
+                }
+                Op::GotoEqual(id) => {
+                    if self.regs.cmp == 0. {
+                        self.goto(id)?
+                    }
+                }
+                Op::GotoGreater(id) => {
+                    if self.regs.cmp == 1. {
+                        self.goto(id)?
+                    }
+                }
+                Op::Write(val) => {
+                    let val = self.retrieve_value(val).round() as u8 as char;
+                    self.sout.push_back(val);
+                }
+                Op::Read(reg) => {
+                    *self.regs.resolve_mut(reg) = if let Some(c) = self.sout.pop_back() {
+                        c as i64 as f64
+                    } else {
+                        -1.
+                    }
                 }
             }
             self.regs.opptr += 1;
@@ -122,6 +174,18 @@ impl VM {
 
     pub fn stack(&self) -> &VecDeque<f64> {
         &self.stack
+    }
+
+    pub fn io(&self) -> (&VecDeque<char>, &VecDeque<char>) {
+        (&self.sin, &self.sout)
+    }
+
+    fn goto(&mut self, id: &'static str) -> VMResult {
+        if let Some(index) = self.marks.get(id).cloned() {
+            Ok(self.regs.opptr = index)
+        } else {
+            Err(ExecutionError::NoSuchMark)?
+        }
     }
 
     fn retrieve_value(&self, val: Value) -> f64 {
