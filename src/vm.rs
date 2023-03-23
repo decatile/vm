@@ -1,4 +1,4 @@
-use std::collections::VecDeque;
+use std::collections::{VecDeque, HashMap};
 
 #[derive(Clone, Copy, Debug)]
 pub enum Value {
@@ -14,7 +14,8 @@ pub enum Op {
     Sub(Reg, Value),
     Mul(Reg, Value),
     Div(Reg, Value),
-    Nop,
+    Mark(&'static str),
+    Goto(&'static str),
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -30,7 +31,7 @@ pub struct Regs {
     pub a: f64,
     pub b: f64,
     pub c: f64,
-    pub optr: usize,
+    pub opptr: usize,
 }
 
 impl Regs {
@@ -39,7 +40,7 @@ impl Regs {
             Reg::A => &self.a,
             Reg::B => &self.a,
             Reg::C => &self.a,
-            Reg::OpPtr => panic!(),
+            Reg::OpPtr => panic!("ты шо дурак"),
         }
     }
 
@@ -48,24 +49,23 @@ impl Regs {
             Reg::A => &mut self.a,
             Reg::B => &mut self.a,
             Reg::C => &mut self.a,
-            Reg::OpPtr => panic!(),
+            Reg::OpPtr => panic!("ты шо дурак"),
         }
     }
 }
 
+#[derive(Default, Debug)]
 pub struct VM {
     code: VecDeque<Op>,
     stack: VecDeque<f64>,
+    stack_size: Option<usize>,
+    marks: HashMap<&'static str, usize>,
     regs: Regs,
 }
 
 impl VM {
-    pub fn new() -> Self {
-        Self {
-            code: VecDeque::new(),
-            stack: VecDeque::new(),
-            regs: Regs::default(),
-        }
+    pub fn with_sized_stack(stack_size: usize) -> Self {
+        Self { stack_size: Some(stack_size), ..Default::default() }
     }
 
     pub fn load(&mut self, code: &[Op]) {
@@ -74,13 +74,20 @@ impl VM {
 
     pub fn exec(&mut self) -> VMResult {
         loop {
-            let op = if let Some(val) = self.code.get(self.regs.optr).cloned() {
+            let op = if let Some(val) = self.code.get(self.regs.opptr).cloned() {
                 val
             } else {
                 return Ok(());
             };
             match op {
-                Op::Push(val) => self.stack.push_back(self.retrieve_value(val)),
+                Op::Push(val) => {
+                    if let Some(stack_size) = self.stack_size {
+                        if self.stack.len() == stack_size {
+                            Err(ExecutionError::StackOverflow)?;
+                        }
+                    }
+                    self.stack.push_back(self.retrieve_value(val));
+                },
                 Op::Pop(reg) => {
                     if let Some(val) = self.stack.pop_back() {
                         *self.regs.resolve_mut(reg) = val;
@@ -98,8 +105,14 @@ impl VM {
                     }
                     *self.regs.resolve_mut(reg) /= x;
                 }
-                Op::Nop => {}
+                Op::Mark(id) => drop(self.marks.insert(id, self.regs.opptr)),
+                Op::Goto(id) => if let Some(index) = self.marks.get(id).cloned() {
+                    self.regs.opptr = index;
+                } else {
+                    Err(ExecutionError::NoSuchMark)?
+                }
             }
+            self.regs.opptr += 1;
         }
     }
 
@@ -124,6 +137,7 @@ pub type VMResult = Result<(), ExecutionError>;
 #[derive(Clone, Debug)]
 pub enum ExecutionError {
     EmptyStack,
+    StackOverflow,
     ZeroDivisionError,
-    BadPtr,
+    NoSuchMark,
 }
