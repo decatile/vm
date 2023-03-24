@@ -5,7 +5,7 @@ use crate::parser::{OpType, Token, TokenValue};
 #[derive(Clone, Debug)]
 pub enum Expr {
     Number(f64),
-    Binary(Box<Expr>, Box<Expr>, OpType),
+    Binary(OpType, Box<Expr>, Box<Expr>),
 }
 
 enum IntermediateExpr {
@@ -62,7 +62,7 @@ fn process(tokens: &mut [IntermediateExpr]) -> Result<(), LexError> {
             let rhs = mem::replace(&mut tokens[arg_indexes[1]], IntermediateExpr::Empty);
             if let (IntermediateExpr::Owned(lhs), IntermediateExpr::Owned(rhs)) = (lhs, rhs) {
                 tokens[op_index] =
-                    IntermediateExpr::Owned(Expr::Binary(Box::new(lhs), Box::new(rhs), op));
+                    IntermediateExpr::Owned(Expr::Binary(op, Box::new(lhs), Box::new(rhs)));
             } else {
                 unreachable!()
             }
