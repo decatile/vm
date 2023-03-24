@@ -1,7 +1,7 @@
 #[derive(Clone, Copy, Debug)]
 pub struct Token {
-    index: usize,
-    value: TokenValue,
+    pub index: usize,
+    pub value: TokenValue,
 }
 
 #[derive(Clone, Copy, Debug)]
