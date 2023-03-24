@@ -64,7 +64,10 @@ pub fn parse(expr: &str) -> ParseResult {
                         value: TokenValue::RP,
                     })
                 } else if c != ' ' {
-                    Err((index, ParseError::UnexpectedCharacter(c)))?
+                    Err(ParseError {
+                        index,
+                        value: ParseErrorValue::UnexpectedCharacter,
+                    })?
                 }
             }
             State::Number(ref mut num) => {
@@ -82,7 +85,10 @@ pub fn parse(expr: &str) -> ParseResult {
                     num.push(c);
                 } else if c == '.' {
                     if num.contains('.') {
-                        Err((index, ParseError::MultipleDots))?
+                        Err(ParseError {
+                            index,
+                            value: ParseErrorValue::MultipleDots,
+                        })?
                     }
                     num.push(c)
                 } else if c == '(' {
@@ -112,23 +118,35 @@ pub fn parse(expr: &str) -> ParseResult {
                     });
                     state = State::Empty
                 } else {
-                    Err((index, ParseError::UnexpectedCharacter(c)))?
+                    Err(ParseError {
+                        index,
+                        value: ParseErrorValue::UnexpectedCharacter,
+                    })?
                 }
             }
             State::LeadingDot => {
                 if c.is_digit(10) {
                     state = State::Number(c.to_string());
                 } else if c == '.' {
-                    Err((index, ParseError::MultipleDots))?;
+                    Err(ParseError {
+                        index,
+                        value: ParseErrorValue::MultipleDots,
+                    })?
                 } else {
-                    Err((index, ParseError::SingleDot))?;
+                    Err(ParseError {
+                        index,
+                        value: ParseErrorValue::SingleDot,
+                    })?
                 }
             }
         }
     }
     match state {
         State::Empty => {}
-        State::LeadingDot => Err((expr.len() - 1, ParseError::SingleDot))?,
+        State::LeadingDot => Err(ParseError {
+            index: expr.len() - 1,
+            value: ParseErrorValue::SingleDot,
+        })?,
         State::Number(num) => tokens.push(Token {
             index: expr.len() - num.len(),
             value: TokenValue::Num(num.parse::<f64>().unwrap()),
@@ -137,11 +155,17 @@ pub fn parse(expr: &str) -> ParseResult {
     Ok(tokens)
 }
 
-pub type ParseResult = Result<Vec<Token>, (usize, ParseError)>;
+pub type ParseResult = Result<Vec<Token>, ParseError>;
 
 #[derive(Clone, Copy, Debug)]
-pub enum ParseError {
-    UnexpectedCharacter(char),
+pub struct ParseError {
+    index: usize,
+    value: ParseErrorValue,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub enum ParseErrorValue {
+    UnexpectedCharacter,
     SingleDot,
     MultipleDots,
 }
