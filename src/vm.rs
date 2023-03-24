@@ -21,9 +21,7 @@ pub enum Op {
     Cmp(Value, Value),
     Mark(&'static str),
     Goto(&'static str),
-    GotoLess(&'static str),
-    GotoEqual(&'static str),
-    GotoGreater(&'static str),
+    GotoCmp(&'static str, Value),
     Write(Value),
     Read(Reg),
 }
@@ -87,7 +85,7 @@ impl VM {
         }
     }
 
-    pub fn load(&mut self, code: &[Op]) {
+    pub fn load<I: IntoIterator<Item = Op>>(&mut self, code: I) {
         self.code.extend(code);
     }
 
@@ -137,18 +135,8 @@ impl VM {
                 }
                 Op::Mark(id) => drop(self.marks.insert(id, self.regs.opptr)),
                 Op::Goto(id) => self.goto(id)?,
-                Op::GotoLess(id) => {
-                    if self.regs.cmp == -1. {
-                        self.goto(id)?
-                    }
-                }
-                Op::GotoEqual(id) => {
-                    if self.regs.cmp == 0. {
-                        self.goto(id)?
-                    }
-                }
-                Op::GotoGreater(id) => {
-                    if self.regs.cmp == 1. {
+                Op::GotoCmp(id, val) => {
+                    if self.retrieve_value(val) == self.regs.cmp {
                         self.goto(id)?
                     }
                 }
@@ -198,7 +186,7 @@ impl VM {
 
 pub type VMResult = Result<(), ExecutionError>;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Copy, Debug)]
 pub enum ExecutionError {
     EmptyStack,
     StackOverflow,
