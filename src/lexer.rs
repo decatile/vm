@@ -1,4 +1,4 @@
-use std::{borrow::Cow, mem};
+use std::mem;
 
 use crate::parser::{OpType, Token, TokenValue};
 
@@ -39,12 +39,12 @@ pub fn lex<I: IntoIterator<Item = Token>>(tokens: I) -> LexerResult {
 }
 
 fn process(tokens: &mut [IntermediateExpr]) -> Result<(), LexError> {
-    while let Some((lpar_index, rpar_index)) = find_parenthesises(&tokens)? {
+    while let Some((lpar_index, rpar_index)) = find_parenthesises(tokens)? {
         tokens[lpar_index] = IntermediateExpr::Empty;
         tokens[rpar_index] = IntermediateExpr::Empty;
         process(&mut tokens[lpar_index + 1..rpar_index])?;
     }
-    while let Some((op_index, arg_indexes)) = find_expr(&tokens)? {
+    while let Some((op_index, arg_indexes)) = find_expr(tokens)? {
         if let IntermediateExpr::Token(
             token @ Token {
                 value: TokenValue::Op(op),
@@ -89,21 +89,19 @@ fn find_parenthesises(tokens: &[IntermediateExpr]) -> Result<Option<(usize, usiz
     });
     if let Some((lpar_index, lpar_token)) = lpar {
         let offset = tokens.iter().skip(lpar_index + 1).position(|x| {
-            if let IntermediateExpr::Token(Token {
-                value: TokenValue::RP,
-                ..
-            }) = x
-            {
-                true
-            } else {
-                false
-            }
+            matches!(
+                x,
+                IntermediateExpr::Token(Token {
+                    value: TokenValue::RP,
+                    ..
+                })
+            )
         });
         if let Some(offset) = offset {
             Ok(Some((lpar_index, offset + lpar_index + 1)))
         } else {
             Err(LexError {
-                token: lpar_token.clone(),
+                token: *lpar_token,
                 value: LexErrorValue::UnmatchedParenthesis,
             })
         }
@@ -114,15 +112,13 @@ fn find_parenthesises(tokens: &[IntermediateExpr]) -> Result<Option<(usize, usiz
 
 fn find_expr(tokens: &[IntermediateExpr]) -> Result<Option<(usize, Vec<usize>)>, LexError> {
     let op = tokens.iter().position(|x| {
-        if let IntermediateExpr::Token(Token {
-            value: TokenValue::Op(..),
-            ..
-        }) = x
-        {
-            true
-        } else {
-            false
-        }
+        matches!(
+            x,
+            IntermediateExpr::Token(Token {
+                value: TokenValue::Op(..),
+                ..
+            })
+        )
     });
     if let Some(op) = op {
         let args = tokens

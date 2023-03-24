@@ -49,7 +49,7 @@ pub fn parse(expr: &str) -> ParseResult {
                         index,
                         value: TokenValue::Op(op),
                     })
-                } else if c.is_digit(10) {
+                } else if c.is_ascii_digit() {
                     state = State::Number(c.to_string())
                 } else if c == '.' {
                     state = State::LeadingDot;
@@ -81,7 +81,7 @@ pub fn parse(expr: &str) -> ParseResult {
                         value: TokenValue::Op(op),
                     });
                     state = State::Empty;
-                } else if c.is_digit(10) {
+                } else if c.is_ascii_digit() {
                     num.push(c);
                 } else if c == '.' {
                     if num.contains('.') {
@@ -125,7 +125,7 @@ pub fn parse(expr: &str) -> ParseResult {
                 }
             }
             State::LeadingDot => {
-                if c.is_digit(10) {
+                if c.is_ascii_digit() {
                     state = State::Number(c.to_string());
                 } else if c == '.' {
                     Err(ParseError {

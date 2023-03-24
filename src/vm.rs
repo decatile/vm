@@ -170,7 +170,8 @@ impl VM {
 
     fn goto(&mut self, id: &'static str) -> VMResult {
         if let Some(index) = self.marks.get(id).cloned() {
-            Ok(self.regs.opptr = index)
+            self.regs.opptr = index;
+            Ok(())
         } else {
             Err(ExecutionError::NoSuchMark)?
         }
@@ -179,7 +180,7 @@ impl VM {
     fn retrieve_value(&self, val: Value) -> f64 {
         match val {
             Value::Lit(lit) => lit,
-            Value::Reg(reg) => self.regs.resolve(reg).clone(),
+            Value::Reg(reg) => *self.regs.resolve(reg),
         }
     }
 }
