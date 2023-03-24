@@ -129,7 +129,10 @@ pub fn parse(expr: &str) -> ParseResult {
     match state {
         State::Empty => {}
         State::LeadingDot => Err((expr.len() - 1, ParseError::SingleDot))?,
-        State::Number(num) => todo!(),
+        State::Number(num) => tokens.push(Token {
+            index: expr.len() - num.len(),
+            value: TokenValue::Num(num.parse::<f64>().unwrap()),
+        }),
     }
     Ok(tokens)
 }
