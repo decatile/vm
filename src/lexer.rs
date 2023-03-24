@@ -1,5 +1,6 @@
 use crate::parser::{OpType, Token, TokenValue};
 
+#[derive(Clone, Debug)]
 pub enum Expr {
     Number(f64),
     Binary(Box<Expr>, Box<Expr>, OpType),
