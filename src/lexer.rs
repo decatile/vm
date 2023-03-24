@@ -20,7 +20,7 @@ pub fn lex<I: IntoIterator<Item = Token>>(tokens: I) -> LexerResult {
     process(&mut tokens)
 }
 
-fn process<'a>(tokens: &mut [IntermediateExpr]) -> LexerResult {
+fn process(tokens: &mut [IntermediateExpr]) -> LexerResult {
     while let Some((lpar_index, rpar_index)) = find_parenthesises(&tokens)? {
         tokens[lpar_index] = IntermediateExpr::Empty;
         tokens[rpar_index] = IntermediateExpr::Empty;
