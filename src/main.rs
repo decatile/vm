@@ -1,4 +1,4 @@
-use crate::vm::{Op, Reg, Value, VM};
+use crate::vm::{VM};
 
 mod codegen;
 mod lexer;
