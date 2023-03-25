@@ -88,14 +88,23 @@ fn find_parenthesises(tokens: &[IntermediateExpr]) -> Result<Option<(usize, usiz
         }
     });
     if let Some((lpar_index, lpar_token)) = lpar {
+        let mut par_count = 1;
         let offset = tokens.iter().skip(lpar_index + 1).position(|x| {
-            matches!(
+            par_count += matches!(
+                x,
+                IntermediateExpr::Token(Token {
+                    value: TokenValue::LP,
+                    ..
+                })
+            ) as i32;
+            par_count -= matches!(
                 x,
                 IntermediateExpr::Token(Token {
                     value: TokenValue::RP,
                     ..
                 })
-            )
+            ) as i32;
+            par_count == 0
         });
         if let Some(offset) = offset {
             Ok(Some((lpar_index, offset + lpar_index + 1)))
@@ -143,8 +152,8 @@ pub type LexerResult = Result<Box<Expr>, LexError>;
 
 #[derive(Clone, Copy, Debug)]
 pub struct LexError {
-    token: Token,
-    value: LexErrorValue,
+    pub token: Token,
+    pub value: LexErrorValue,
 }
 
 #[derive(Clone, Copy, Debug)]

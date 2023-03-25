@@ -159,8 +159,8 @@ pub type ParseResult = Result<Vec<Token>, ParseError>;
 
 #[derive(Clone, Copy, Debug)]
 pub struct ParseError {
-    index: usize,
-    value: ParseErrorValue,
+    pub index: usize,
+    pub value: ParseErrorValue,
 }
 
 #[derive(Clone, Copy, Debug)]
