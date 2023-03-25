@@ -9,7 +9,21 @@ pub enum Value {
     Reg(Reg),
 }
 
-#[derive(Clone, Copy, Debug)]
+impl TryFrom<&str> for Value {
+    type Error = ();
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        if let Some(num) = value.parse::<f64>().ok() {
+            Ok(Value::Lit(num))
+        } else if let Ok(reg) = Reg::try_from(value) {
+            Ok(Value::Reg(reg))
+        } else {
+            Err(())
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
 pub enum Op {
     Push(Value),
     Pop(Reg),
@@ -19,9 +33,89 @@ pub enum Op {
     Div(Reg, Value),
     Mov(Reg, Value),
     Cmp(Value, Value),
-    Mark(&'static str),
-    Goto(&'static str),
-    GotoEq(&'static str, Value),
+    Mark(String),
+    Goto(String),
+    GotoEq(String, Value),
+}
+
+impl From<&str> for Op {
+    fn from(value: &str) -> Self {
+        let args = value.split_whitespace().collect::<Vec<_>>();
+        match args[0] {
+            "push" => {
+                let value = Value::try_from(args[1]).expect("Invalid value");
+                Op::Push(value)
+            }
+            "pop" => {
+                let reg = Reg::try_from(args[1]).expect("Invalid register");
+                Op::Pop(reg)
+            }
+            "add" => {
+                let reg = Reg::try_from(args[1]).expect("Invalid register");
+                let value = Value::try_from(args[2]).expect("Invalid value");
+                Op::Add(reg, value)
+            }
+            "sub" => {
+                let reg = Reg::try_from(args[1]).expect("Invalid register");
+                let value = Value::try_from(args[2]).expect("Invalid value");
+                Op::Sub(reg, value)
+            }
+            "mul" => {
+                let reg = Reg::try_from(args[1]).expect("Invalid register");
+                let value = Value::try_from(args[2]).expect("Invalid value");
+                Op::Mul(reg, value)
+            }
+            "div" => {
+                let reg = Reg::try_from(args[1]).expect("Invalid register");
+                let value = Value::try_from(args[2]).expect("Invalid value");
+                Op::Div(reg, value)
+            }
+            "mov" => {
+                let reg = Reg::try_from(args[1]).expect("Invalid register");
+                let value = Value::try_from(args[2]).expect("Invalid value");
+                Op::Mov(reg, value)
+            }
+            "cmp" => {
+                let value1 = Value::try_from(args[1]).expect("Invalid value");
+                let value2 = Value::try_from(args[2]).expect("Invalid value");
+                Op::Cmp(value1, value2)
+            }
+            "goto" => {
+                let mark = args[1];
+                assert!(
+                    mark.chars().all(|x| x.is_alphanumeric()),
+                    "Mark should be alphanumeric"
+                );
+                Op::Goto(mark.to_string())
+            }
+            "gotoeq" => {
+                let mark = args[1];
+                assert!(
+                    mark.chars().all(|x| x.is_alphanumeric()),
+                    "Mark should be alphanumeric"
+                );
+                let value = Value::try_from(args[2]).expect("Invalid value");
+                Op::GotoEq(mark.to_string(), value)
+            }
+            _ => {
+                // this can be mark
+                let mut chars = value.chars();
+                assert_eq!(
+                    chars
+                        .next_back()
+                        .expect("Only mark can appear in this pattern"),
+                    ':',
+                    "Mark should end with ':'"
+                );
+                let name = chars.collect::<String>();
+                assert!(
+                    name.chars().all(|x| x.is_alphanumeric()),
+                    "Mark should be alphanumeric"
+                );
+                Op::Mark(name)
+            }
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -31,6 +125,21 @@ pub enum Reg {
     CX,
     Cmp,
     OpPtr,
+}
+
+impl TryFrom<&str> for Reg {
+    type Error = ();
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        match value {
+            "ax" => Ok(Reg::AX),
+            "bx" => Ok(Reg::BX),
+            "cx" => Ok(Reg::CX),
+            "cmp" => Ok(Reg::Cmp),
+            "opi" => Ok(Reg::OpPtr),
+            _ => Err(()),
+        }
+    }
 }
 
 #[derive(Default, Debug)]
@@ -69,7 +178,7 @@ pub struct VM {
     code: VecDeque<Op>,
     stack: VecDeque<f64>,
     stack_size: Option<usize>,
-    marks: HashMap<&'static str, usize>,
+    marks: HashMap<String, usize>,
     regs: Regs,
 }
 
@@ -149,8 +258,8 @@ impl VM {
         &self.stack
     }
 
-    fn goto(&mut self, id: &'static str) -> VMResult {
-        if let Some(index) = self.marks.get(id).cloned() {
+    fn goto(&mut self, id: String) -> VMResult {
+        if let Some(index) = self.marks.get(&id).cloned() {
             self.regs.opptr = index;
             Ok(())
         } else {
