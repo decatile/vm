@@ -30,7 +30,7 @@ pub fn lex<I: IntoIterator<Item = Token>>(tokens: I) -> LexerResult {
         .into_iter()
         .find_map(|x| {
             if let IntermediateExpr::Owned(expr) = x {
-                Some(expr)
+                Some(Box::new(expr))
             } else {
                 None
             }
@@ -139,7 +139,7 @@ fn find_expr(tokens: &[IntermediateExpr]) -> Result<Option<(usize, Vec<usize>)>,
     }
 }
 
-pub type LexerResult = Result<Expr, LexError>;
+pub type LexerResult = Result<Box<Expr>, LexError>;
 
 #[derive(Clone, Copy, Debug)]
 pub struct LexError {

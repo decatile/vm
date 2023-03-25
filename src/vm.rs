@@ -21,9 +21,7 @@ pub enum Op {
     Cmp(Value, Value),
     Mark(&'static str),
     Goto(&'static str),
-    GotoCmp(&'static str, Value),
-    Write(Value),
-    Read(Reg),
+    GotoEq(&'static str, Value),
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -73,8 +71,6 @@ pub struct VM {
     stack_size: Option<usize>,
     marks: HashMap<&'static str, usize>,
     regs: Regs,
-    sout: VecDeque<char>,
-    sin: VecDeque<char>,
 }
 
 impl VM {
@@ -135,20 +131,9 @@ impl VM {
                 }
                 Op::Mark(id) => drop(self.marks.insert(id, self.regs.opptr)),
                 Op::Goto(id) => self.goto(id)?,
-                Op::GotoCmp(id, val) => {
+                Op::GotoEq(id, val) => {
                     if self.retrieve_value(val) == self.regs.cmp {
                         self.goto(id)?
-                    }
-                }
-                Op::Write(val) => {
-                    let val = self.retrieve_value(val).round() as u8 as char;
-                    self.sout.push_back(val);
-                }
-                Op::Read(reg) => {
-                    *self.regs.resolve_mut(reg) = if let Some(c) = self.sout.pop_back() {
-                        c as i64 as f64
-                    } else {
-                        -1.
                     }
                 }
             }
@@ -162,10 +147,6 @@ impl VM {
 
     pub fn stack(&self) -> &VecDeque<f64> {
         &self.stack
-    }
-
-    pub fn io(&self) -> (&VecDeque<char>, &VecDeque<char>) {
-        (&self.sin, &self.sout)
     }
 
     fn goto(&mut self, id: &'static str) -> VMResult {
